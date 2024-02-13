@@ -6,6 +6,8 @@ local Collect = require(Services.Collect)
 
 
 --// Methods
+-- rotates the give matrix clockwise in place
+-- matrix must be an nxn matrix
 function MatrixUtil.RotateClockwise(matrix: table)
 	local n = #matrix
 
@@ -20,6 +22,8 @@ function MatrixUtil.RotateClockwise(matrix: table)
 	end
 end
 
+-- rotates the give matrix counterclockwise in place
+-- matrix must be an nxn matrix
 function MatrixUtil.RotateCounterClockwise(matrix: table)
 	local n = #matrix
 
@@ -34,6 +38,7 @@ function MatrixUtil.RotateCounterClockwise(matrix: table)
 	end
 end
 
+-- gets the elements in the nth row of the matrix
 function MatrixUtil.GetRow(matrix: table, row: number): table
 	local elements = {}
 	for column = 1, #matrix do
@@ -43,6 +48,7 @@ function MatrixUtil.GetRow(matrix: table, row: number): table
 	return elements
 end
 
+-- gets the elements in the nth column of the matrix
 function MatrixUtil.GetColumn(matrix: table, column: number): table
 	local elements = {}
 	for row = 1, #matrix[1] do
@@ -52,6 +58,7 @@ function MatrixUtil.GetColumn(matrix: table, column: number): table
 	return elements
 end
 
+-- replaces the elements in the nth row
 function MatrixUtil.ReplaceRow(matrix: table, row: number, elements: table)
 	assert(
 		#matrix == #elements, 
@@ -62,6 +69,7 @@ function MatrixUtil.ReplaceRow(matrix: table, row: number, elements: table)
 	end
 end
 
+-- replaces the elements in the nth column
 function MatrixUtil.ReplaceColumn(matrix: table, column: number, elements: table)
 	assert(
 		#matrix[1] == #elements, 
@@ -72,6 +80,7 @@ function MatrixUtil.ReplaceColumn(matrix: table, column: number, elements: table
 	end
 end
 
+-- deep copies a matrix
 function MatrixUtil.Copy(tbl: table)
 	if type(tbl) == "table" then
 		local copy = {}
@@ -84,6 +93,7 @@ function MatrixUtil.Copy(tbl: table)
 	end
 end
 
+-- creates an nxm matrix with the value in every position
 function MatrixUtil.Create(size: Vector2, value: any)
 	local matrix = {}
 	for x = 1, size.X do
@@ -97,6 +107,8 @@ function MatrixUtil.Create(size: Vector2, value: any)
 	return matrix
 end
 
+-- @debug
+-- format prints a matrix
 function MatrixUtil.Print(matrix: table)
 	local n = #matrix
 	local m = #matrix[1]

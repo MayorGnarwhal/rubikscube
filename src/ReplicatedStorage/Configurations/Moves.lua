@@ -6,13 +6,11 @@ local Moves = {}
 
 local function CombineMoves(...): table
 	local newMove = {}
-	
 	for i, move in pairs({...}) do
 		for j, args in ipairs(move) do
 			table.insert(newMove, args)
 		end
 	end
-	
 	return newMove
 end
 

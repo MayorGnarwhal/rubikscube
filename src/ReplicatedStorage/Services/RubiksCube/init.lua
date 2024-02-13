@@ -9,6 +9,7 @@ local Services = game.ReplicatedStorage.Services
 local MatrixUtil = require(Services.MatrixUtil)
 local Collect = require(Services.Collect)
 local Tween = require(Services.Tween)
+local Util = require(Services.Util)
 
 local Configurations = game.ReplicatedStorage.Configurations
 local Palette = require(Configurations.Palette)
@@ -42,21 +43,6 @@ local function Midpoint(children: {BasePart}): Vector3
 	return mid / (#children == 0 and 1 or #children)
 end
 
-local function GetNormalId(normal: Vector3)
-	local minDistance = math.huge
-	local closestNormalId
-	
-	for i, normalId in pairs(Enum.NormalId:GetEnumItems()) do
-		local distance = normal.Unit:Dot(Vector3.FromNormalId(normalId))
-		if distance < minDistance then
-			minDistance = distance
-			closestNormalId = normalId
-		end
-	end
-	
-	return closestNormalId
-end
-
 local function FlipArray(tbl: table)
 	local n, m = #tbl, #tbl/2
 	for i = 1, m do
@@ -66,7 +52,10 @@ end
 
 
 --// Constructor
--- @public
+---- @public
+--- creates a new rubiks cube. adds a cube to the workspace
+-- @param dimensions	width and height of each face in cublets
+-- @param size			size of each cublet in studs
 function RubiksCube.new(dimensions: number, size: number)
 	local cube = Generator.Create(dimensions, size)
 	
@@ -74,11 +63,6 @@ function RubiksCube.new(dimensions: number, size: number)
 	for i, faceId in pairs(Enum.NormalId:GetEnumItems()) do
 		map[faceId.Name] = MatrixUtil.Create(Vector2.new(dimensions, dimensions), faceId.Name)
 	end
-	--local map = Collect(Enum.NormalId:GetEnumItems()):mapWithKeys(function(normalId)
-	--	local column = Collect.create(dimensions, normalId.Name):get()
-	--	local matrix = Collect.create(dimensions, column):get()
-	--	return normalId.Name, matrix
-	--end):get()
 	
 	local self = setmetatable({
 		Dimensions = dimensions,
@@ -93,7 +77,13 @@ function RubiksCube.new(dimensions: number, size: number)
 		Rotating = false,
 		Shuffling = false,
 		
-		StateChanged = Instance.new("BindableEvent"),
+		StateChangedBindable = Instance.new("BindableEvent"),
+		SolveBeginBindable = Instance.new("BindableEvent"),
+		SolveFinishBindable = Instance.new("BindableEvent"),
+		
+		Scrambled = false,
+		SolveBegan = nil,
+		NumTurns = 0,
 	}, RubiksCube)
 	
 	self:ApplyPalette(Palette.Standard)
@@ -103,7 +93,10 @@ end
 
 
 --// Methods
--- @private
+---- @private
+--- applies rotation to the physical representation
+-- @param cell			index of the cell clicked 
+-- @param rotationId	normal of the rotation axis
 function RubiksCube:_rotateCube(cell: Vector3, rotationId: Enum.NormalId)
 	local rotationNormal = Vector3.fromNormalId(rotationId)
 	local rotationAxis = AxisMap[rotationId]
@@ -147,12 +140,13 @@ function RubiksCube:_rotateCube(cell: Vector3, rotationId: Enum.NormalId)
 	end
 end
 
--- @private
+---- @private
+--- applies rotation to the matrix representation
 function RubiksCube:_rotateCubeMap(cell: Vector3, faceId: Enum.NormalId, rotationId: Enum.NormalId, directionId: Enum.NormalId)
 	local cube = self.Map
 	
 	--print(string.rep("-", 20))
-	local n = 3
+	local n = self.Dimensions
 
 	local axis = AxisMap[rotationId]
 	local faceNormal = Vector3.fromNormalId(faceId)
@@ -170,7 +164,7 @@ function RubiksCube:_rotateCubeMap(cell: Vector3, faceId: Enum.NormalId, rotatio
 		end
 
 		local clockwise = angle > 0
-		local rotationFace = GetNormalId(axisNormal)
+		local rotationFace = Util.GetNormalId(axisNormal)
 		if clockwise then
 			MatrixUtil.RotateClockwise(cube[rotationFace.Name])
 		else
@@ -181,7 +175,7 @@ function RubiksCube:_rotateCubeMap(cell: Vector3, faceId: Enum.NormalId, rotatio
 	local faces = {faceId}
 	for i = 2, 4 do
 		local normal = Vector3.fromNormalId(faces[i - 1]):Cross(rotationNormal)
-		table.insert(faces, GetNormalId(normal))
+		table.insert(faces, Util.GetNormalId(normal))
 	end
 
 	local temp = MatrixUtil.Copy(cube[faces[1].Name])
@@ -233,11 +227,18 @@ function RubiksCube:_rotateCubeMap(cell: Vector3, faceId: Enum.NormalId, rotatio
 	--print(string.rep("-", 20))
 end
 
--- @public
-function RubiksCube:Rotate(cell: Vector3, faceId: Enum.NormalId, directionId: Enum.NormalId)
-	if self.Rotating then return end
+---- @private
+--- rotates the cube and its map
+-- @param cell			index of the cell clicked. can be calculated with self:GetCell()
+-- @param faceId		face of the cube that was clicked
+-- @param directionId	direction of rotation
+function RubiksCube:_performRotate(cell: Vector3, faceId: Enum.NormalId, directionId: Enum.NormalId)
+	if self.Rotating then
+		warn("Attempting to rotate cube while already rotating")
+		return 
+	end
 	self.Rotating = true
-	
+
 	--print(cell, "//", faceId.Name, "//", directionId.Name)
 
 	local rotationNormal = Vector3.fromNormalId(faceId):Cross(Vector3.fromNormalId(directionId))
@@ -247,50 +248,81 @@ function RubiksCube:Rotate(cell: Vector3, faceId: Enum.NormalId, directionId: En
 		return
 	end
 	
-	local rotationId = GetNormalId(rotationNormal)
+	if self.Scrambled and not self.SolveBegan then
+		self.SolveBegan = os.clock()
+		self.SolveBeginBindable:Fire(self.SolveBegan)
+		self.NumTurns = 0
+	end
 	
+	if self.SolveBegan then
+		self.NumTurns += 1
+	end
+
+	local rotationId = Util.GetNormalId(rotationNormal)
+
 	self:_rotateCube(cell, rotationId)
 	self:_rotateCubeMap(cell, faceId, rotationId, directionId)
+
+	self.StateChangedBindable:Fire(self.Map)
 	
-	self.StateChanged:Fire()
+	if self.SolveBegan and self:IsSolved() then
+		local timeToSolve = os.clock() - self.SolveBegan
+		self.SolveFinishBindable:Fire(true, timeToSolve, self.NumTurns)
+		self.SolveBegan = nil
+		self.Scrambled = false
+		self.NumTurns = 0
+	end
 
 	self.Rotating = false
 end
 
--- @public
-function RubiksCube:Move(moveArgs: table)
-	self:Rotate(unpack(moveArgs))
+---- @public
+--- generic user facing rotate function
+--- gaurds against extra locked states of the cube
+function RubiksCube:Rotate(cell: Vector3, faceId: Enum.NormalId, directionId: Enum.NormalId)
+	if self.Shuffling then return end
+	
+	self:_performRotate(cell, faceId, directionId)
 end
 
+---- @public
+--- implements a move from the Moves table
+-- @param move		a list of rotation arguments from Moves table
+function RubiksCube:Move(move: table, frontFace: Enum.NormalId?)
+	for i, args in ipairs(move) do
+		self:_performRotate(unpack(args))
+	end
+end
+
+---- @public
 --- applies random moves to the cube
 -- @param turns?	number of moves to apply				
--- @returns table	array of the moves applied
--- @public
-function RubiksCube:Shuffle(turns: number?): table
+-- @return table	array of the moves applied
+function RubiksCube:Scramble(turns: number?): table
 	if self.Shuffling then return end
 	self.Shuffling = true
+	self.Scrambled = false
 	
 	local speed = self.Speed
-	self.Speed = Config.ShuffleRotateSpeed
+	self.Speed = Config.ScrambleRotateSpeed
 	
-	local options = Collect(Moves):keys()
-	local shuffle = {}
+	local scramble = Util.GenerateScramble(turns or Config.ScrambleLength)
 	
-	turns = turns or Config.ShuffleLength
-	for i = 1, turns do
-		local moveName = options:random()
-		local move = Moves[moveName]
-		table.insert(shuffle, moveName)
-		
-		for j, args in ipairs(move) do
-			self:Move(args)
+	task.spawn(function() -- run async to return scramble immediately
+		for i, moveName in ipairs(scramble) do
+			self:Move(Moves[moveName])
 		end
-	end
+		
+		self.Speed = speed
+		self.Shuffling = false
+		
+		self.Scrambled = true
+		self.SolveBegan = nil
+	end)
 	
-	self.Speed = speed
-	self.Shuffling = false
+	self.SolveFinishBindable:Fire(false)
 	
-	return shuffle
+	return scramble
 end
 
 -- @public
@@ -312,9 +344,10 @@ end
 -- @public
 function RubiksCube:IsSolved(): boolean
 	for faceName, matrix in pairs(self.Map) do
+		local compare = matrix[1][1]
 		for y = 1, self.Dimensions do
 			for x = 1, self.Dimensions do
-				if matrix[x][y] ~= faceName then
+				if matrix[x][y] ~= compare then
 					return false
 				end
 			end
@@ -324,8 +357,20 @@ function RubiksCube:IsSolved(): boolean
 	return true
 end
 
+
+--// Connections
+---- @public
+-- @return		connection that fires whenever cube is rotated
 function RubiksCube:GetStateChangedSignal(): RBXScriptSignal
-	return self.StateChanged.Event
+	return self.StateChangedBindable.Event
+end
+
+function RubiksCube:GetSolvedSignal(): RBXScriptSignal
+	return self.SolveFinishBindable.Event
+end
+
+function RubiksCube:GetSolveBeganSignal(): RBXScriptSignal
+	return self.SolveBeginBindable.Event
 end
 
 
@@ -333,7 +378,9 @@ end
 -- @public
 function RubiksCube:Destroy()
 	self.Cube:Destroy()
-	self.StateChanged:Destroy()
+	self.StateChangedBindable:Destroy()
+	self.SolveFinishBindable:Destroy()
+	self.SolveBeginBindable:Destroy()
 	table.clear(self.Map)
 end
 

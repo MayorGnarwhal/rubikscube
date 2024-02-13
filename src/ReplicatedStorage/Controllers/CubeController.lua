@@ -4,8 +4,14 @@ local CubeController = {}
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 
+local Controllers = game.ReplicatedStorage.Controllers
+local ScrambleList = require(Controllers.Interface.ScrambleList)
+local CubeMap = require(Controllers.Interface.CubeMap)
+local Timer = require(Controllers.Interface.Timer)
+
 local Services = game.ReplicatedStorage.Services
 local RubiksCube = require(Services.RubiksCube)
+local Util = require(Services.Util)
 
 local Configurations = game.ReplicatedStorage.Configurations
 local Palette = require(Configurations.Palette)
@@ -15,13 +21,12 @@ local LocalPlayer = game.Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
 
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-local Interface = PlayerGui:WaitForChild("MainGui"):WaitForChild("CubeMap")
-
 --// Variables
 local CurrentCube
 local DragConnect
 local StateConnect
+local SolveConnect
+local SolveBeganConnect
 
 
 --// Methods
@@ -29,6 +34,9 @@ function CubeController.CreateCube(dimensions: number)
 	if CurrentCube then
 		CurrentCube:Destroy()
 		StateConnect:Disconnect()
+		SolveConnect:Disconnect()
+		SolveBeganConnect:Disconnect()
+		ScrambleList.Hide()
 	end
 	
 	CurrentCube = RubiksCube.new(dimensions, 5)
@@ -41,24 +49,29 @@ function CubeController.CreateCube(dimensions: number)
 	LocalPlayer.CameraMinZoomDistance = 1.5 * maxSize
 	LocalPlayer.CameraMaxZoomDistance = 2.5 * maxSize
 	
-	CubeController.ApplyPalette()
-	StateConnect = CurrentCube:GetStateChangedSignal():Connect(CubeController.ApplyPalette)
+	CubeMap.Populate(dimensions)
+	CubeMap.ApplyPalette(CurrentCube.Map)
+	
+	StateConnect = CurrentCube:GetStateChangedSignal():Connect(CubeMap.ApplyPalette)
+	SolveBeganConnect = CurrentCube:GetSolveBeganSignal():Connect(function()
+		Timer.Start()
+		ScrambleList.Hide()
+	end)
+	SolveConnect = CurrentCube:GetSolvedSignal():Connect(function(solved: boolean, timeToSolve: number, numTurns: number)
+		Timer.Stop()
+		if solved then
+			Timer.Blink()
+			Timer.SetTime(timeToSolve)
+		else
+			Timer.StopBlinking()
+			Timer.SetTime(0)
+		end
+	end)
 end
 
-function CubeController.ApplyPalette()
-	for side, matrix in pairs(CurrentCube.Map) do
-		local container = Interface:FindFirstChild(side).Content
-
-		for y = 1, 3 do
-			for x = 1, 3 do
-				local num = 3 * (y - 1) + x
-				local cell = container:FindFirstChild(num)
-
-				local face = matrix[x][y]
-				cell.BackgroundColor3 = Palette.Standard[face]
-			end
-		end
-	end
+--- get which which face is the "Front" (facing the camera)
+function CubeController.FrontFace(): Enum.NormalId
+	return Util.GetNormalId(Camera.CFrame.LookVector)
 end
 
 
@@ -98,10 +111,13 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 			end)
 		end
 	elseif input.KeyCode == Enum.KeyCode.R then
-		CubeController.CreateCube(3)
-	elseif input.KeyCode == Enum.KeyCode.T then
+		CubeController.CreateCube(CurrentCube.Dimensions)
+	elseif input.KeyCode == Enum.KeyCode.S then
 		if CurrentCube then
-			CurrentCube:Shuffle()
+			local moves = CurrentCube:Scramble()
+			if moves then
+				ScrambleList.Show(moves)
+			end
 		end
 	end
 end)
