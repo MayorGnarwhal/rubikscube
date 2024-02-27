@@ -22,7 +22,7 @@ local function FormatTime(s: number): string
 	s -= seconds
 	local milliseconds = math.round(s * 1000)
 	
-	return ("%.02d:%.02d.%.03d"):format(minutes, seconds, milliseconds)
+	return ("%.02d:%.02d:%.03d"):format(minutes, seconds, milliseconds)
 end
 
 

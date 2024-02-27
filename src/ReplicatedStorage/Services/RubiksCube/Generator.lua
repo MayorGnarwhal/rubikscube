@@ -23,6 +23,7 @@ TemplateCore.Name = "Core"
 TemplateCore.Anchored = true
 TemplateCore.CastShadow = false
 TemplateCore.CanCollide = false
+TemplateCore.CanQuery = false
 TemplateCore.TopSurface = Enum.SurfaceType.Smooth
 TemplateCore.BottomSurface = Enum.SurfaceType.Smooth
 
@@ -31,7 +32,14 @@ TemplateCenter.Name = "Center"
 TemplateCenter.Anchored = true
 TemplateCenter.CastShadow = false
 TemplateCenter.CanCollide = false
+TemplateCenter.CanQuery = false
+TemplateCenter.Transparency = 1
 TemplateCenter.Size = Vector3.new(1, 1, 1)
+
+local TemplateHitbox = TemplateCenter:Clone()
+TemplateHitbox:AddTag("RubiksHitbox")
+TemplateHitbox.Name = "Hitbox"
+TemplateHitbox.CanQuery = true
 
 
 --// Helper functions
@@ -50,6 +58,7 @@ local function CreateCubletFace(cublet: Model, axis: Enum.Axis, index: number)
 	local normal = Vector3.fromNormalId(normalId)
 
 	local face = TemplateFace:Clone()
+	face:AddTag("Face")
 	face:SetAttribute("Face", normalId.Name)
 	face.Name = "Face" .. axis.Name
 
@@ -64,6 +73,25 @@ local function CreateCubletFace(cublet: Model, axis: Enum.Axis, index: number)
 	
 	face.CFrame = cublet.PrimaryPart.CFrame * CFrame.new(offset, rotation)
 	face.Parent = cublet
+end
+
+local function GetCubletType(cublet: Model)
+	local numFaces = 0
+	for i, child in pairs(cublet:GetChildren()) do
+		if child:HasTag("Face") then
+			numFaces += 1
+		end
+	end
+	
+	if numFaces == 0 then
+		return "Core"
+	elseif numFaces == 1 then
+		return "Center"
+	elseif numFaces == 2 then
+		return "Edge"
+	elseif numFaces == 3 then
+		return "Corner"
+	end
 end
 
 
@@ -96,16 +124,26 @@ function Generator.Create(dimensions: number, size: number): Model
 					if z == 1 or z == dimensions then
 						CreateCubletFace(cublet, Enum.Axis.Z, z)
 					end
+					
+					local cubletType = GetCubletType(cublet)
+					cublet:SetAttribute("CubletType", cubletType)
 				end
 			end
 		end
 	end
 	
+	local cframe, size = cube:GetBoundingBox()
+	
 	local center = TemplateCenter:Clone()
-	center.CFrame = cube:GetBoundingBox()
+	center.CFrame = cframe
 	center.Parent = cube
+	
+	local hitbox = TemplateHitbox:Clone()
+	hitbox.CFrame = cframe
+	hitbox.Size = size - Vector3.one * Config.FaceThickness * 2
+	hitbox.Parent = cube
 
-	cube.PrimaryPart = center
+	cube.PrimaryPart = hitbox -- center
 	cube.Parent = workspace
 
 	return cube

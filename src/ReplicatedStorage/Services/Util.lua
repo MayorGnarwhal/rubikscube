@@ -6,6 +6,19 @@ local Config = require(Configurations.Config)
 
 
 --// Methods
+function Util.RoundToNearest(number, increment)
+	increment = increment or 1
+	return math.round(number / increment) * increment
+end
+
+function Util.RoundVectorToNearest(vector: Vector3, increment): Vector3
+	return Vector3.new(
+		Util.RoundToNearest(vector.X, increment),
+		Util.RoundToNearest(vector.Y, increment),
+		Util.RoundToNearest(vector.Z, increment)
+	)
+end
+
 function Util.GetNormalId(normal: Vector3): Enum.NormalId
 	local minDistance = math.huge
 	local closestNormalId
@@ -21,6 +34,48 @@ function Util.GetNormalId(normal: Vector3): Enum.NormalId
 	return closestNormalId
 end
 
+function Util.Midpoint(children: {BasePart|Model}): Vector3
+	local mid = Vector3.zero
+	for i, child in pairs(children) do
+		mid += child:GetPivot().Position
+	end
+
+	return mid / (#children == 0 and 1 or #children)
+end
+
+function Util.FlipArray(tbl: table)
+	local n, m = #tbl, #tbl/2
+	for i = 1, m do
+		tbl[i], tbl[n-i+1] = tbl[n-i+1], tbl[i]
+	end
+end
+
+--- creates a deep copy of a given table
+--- does not copy metatables for efficency
+-- @param tbl		table to copy
+-- @return table	deep copy of tbl
+function Util.DeepCopy(tbl: table)
+	if type(tbl) == "table" then
+		local copy = {}
+		for key, value in pairs(tbl) do
+			copy[Util.DeepCopy(key)] = Util.DeepCopy(value)
+		end
+		return copy
+	else
+		return tbl
+	end
+end
+
+function Util.Flatten(tbl2D: table)
+	local array = {}
+	for i, tbl in ipairs(tbl2D) do
+		for j, v in ipairs(tbl) do
+			table.insert(array, v)
+		end
+	end
+	return array
+end
+
 --- generates a random sequence of cube moves
 --- makes sure that no move undos the previous move
 -- @param scrambleLength	number of moves to generate
@@ -29,7 +84,7 @@ end
 function Util.GenerateScramble(scrambleLength: number, seed: number?): table
 	local rng = seed and Random.new(seed) or Random.new()
 	local scramble = {}
-	
+
 	local lastMove = ""
 	while #scramble < scrambleLength do
 		local move = Config.ScrambleMoves[rng:NextInteger(1, #Config.ScrambleMoves)]
@@ -38,7 +93,7 @@ function Util.GenerateScramble(scrambleLength: number, seed: number?): table
 			lastMove = move
 		end
 	end
-	
+
 	return scramble
 end
 
@@ -47,6 +102,25 @@ end
 -- @return string	formated move, replacing i counterclockwise indicator with '
 function Util.FormatMoveName(moveName: string): string
 	return moveName:gsub("i", "'")
+end
+
+function Util.FuzzyEq(val1, val2, epsilon)
+	local diff = val1 - val2
+	return -epsilon <= diff and diff <= epsilon
+end
+
+function Util.SplitArray(array, numGroups)
+	local split = {}
+	for i = 1, numGroups do
+		split[i] = {}
+	end
+	
+	for i = 1, #array do
+		local group = ((i-1) % numGroups) + 1
+		table.insert(split[group], array[i])
+	end
+	
+	return split
 end
 
 --//

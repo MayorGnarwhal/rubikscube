@@ -2,7 +2,7 @@ local CubeMap = {}
 
 --// Dependencies
 local Configurations = game.ReplicatedStorage.Configurations
-local Palette = require(Configurations.Palette)
+local Palettes = require(Configurations.Palettes)
 
 local LocalPlayer = game.Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -36,7 +36,9 @@ function CubeMap.Populate(dimensions: number)
 	end
 end
 
-function CubeMap.ApplyPalette(cubeMap: table)
+function CubeMap.ApplyPalette(cubeMap: table, palette: Palettes.Palette?)
+	palette = palette or Palettes.Standard
+	
 	for side, matrix in pairs(cubeMap) do
 		local container = Display:FindFirstChild(side).Content
 
@@ -45,7 +47,7 @@ function CubeMap.ApplyPalette(cubeMap: table)
 				local cell = container:FindFirstChild(x .. "_" .. y)
 				local face = matrix[x][y]
 				
-				cell.BackgroundColor3 = Palette.Standard[face]
+				cell.BackgroundColor3 = palette[face]
 			end
 		end
 	end

@@ -6,6 +6,7 @@ local RunService = game:GetService("RunService")
 
 local Controllers = game.ReplicatedStorage.Controllers
 local ScrambleList = require(Controllers.Interface.ScrambleList)
+local CubeSolver = require(Controllers.CubeSolver)
 local CubeMap = require(Controllers.Interface.CubeMap)
 local Timer = require(Controllers.Interface.Timer)
 
@@ -14,7 +15,6 @@ local RubiksCube = require(Services.RubiksCube)
 local Util = require(Services.Util)
 
 local Configurations = game.ReplicatedStorage.Configurations
-local Palette = require(Configurations.Palette)
 local Config = require(Configurations.Config)
 
 local LocalPlayer = game.Players.LocalPlayer
@@ -22,42 +22,53 @@ local Camera = workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
 
 --// Variables
-local CurrentCube
+local Cube
+
 local DragConnect
 local StateConnect
-local SolveConnect
 local SolveBeganConnect
+local SolveEndedConnect
+
+
+--// Helper function
+local function FrontFace(): Enum.NormalId
+	return Util.GetNormalId(Camera.CFrame.LookVector)
+end
 
 
 --// Methods
 function CubeController.CreateCube(dimensions: number)
-	if CurrentCube then
-		CurrentCube:Destroy()
+	if Cube then
+		Cube:Destroy()
 		StateConnect:Disconnect()
-		SolveConnect:Disconnect()
 		SolveBeganConnect:Disconnect()
-		ScrambleList.Hide()
+		SolveEndedConnect:Disconnect()
 	end
 	
-	CurrentCube = RubiksCube.new(dimensions, 5)
+	Cube = RubiksCube.new(dimensions)
+	local cubeModel = Cube:GenerateCube3D(5)
 	
 	Camera.CameraType = Enum.CameraType.Custom
-	Camera.CameraSubject = CurrentCube.CameraSubject
+	Camera.CameraSubject = cubeModel.PrimaryPart
 	
-	local size = CurrentCube.Cube:GetExtentsSize()
+	local size = cubeModel:GetExtentsSize()
 	local maxSize = math.max(size.X, size.Y, size.Z)
 	LocalPlayer.CameraMinZoomDistance = 1.5 * maxSize
 	LocalPlayer.CameraMaxZoomDistance = 2.5 * maxSize
 	
 	CubeMap.Populate(dimensions)
-	CubeMap.ApplyPalette(CurrentCube.Map)
+	CubeMap.ApplyPalette(Cube.Map)
 	
-	StateConnect = CurrentCube:GetStateChangedSignal():Connect(CubeMap.ApplyPalette)
-	SolveBeganConnect = CurrentCube:GetSolveBeganSignal():Connect(function()
+	StateConnect = Cube:GetStateChangedSignal():Connect(function()
+		CubeMap.ApplyPalette(Cube.Map)
+	end)
+	
+	SolveBeganConnect = Cube:GetSolveBeganSignal():Connect(function()
 		Timer.Start()
 		ScrambleList.Hide()
 	end)
-	SolveConnect = CurrentCube:GetSolvedSignal():Connect(function(solved: boolean, timeToSolve: number, numTurns: number)
+	
+	SolveEndedConnect = Cube:GetSolveEndedSignal():Connect(function(solved: boolean, timeToSolve, numTurns)
 		Timer.Stop()
 		if solved then
 			Timer.Blink()
@@ -69,56 +80,68 @@ function CubeController.CreateCube(dimensions: number)
 	end)
 end
 
---- get which which face is the "Front" (facing the camera)
-function CubeController.FrontFace(): Enum.NormalId
-	return Util.GetNormalId(Camera.CFrame.LookVector)
+function CubeController.Scramble()
+	local moves = Cube:Scramble()
+	if moves then
+		print("Scramble:", unpack(moves))
+		ScrambleList.Show(moves)
+	end
 end
 
 
 --// Drag inputs
+local function dragBegan()
+	local targetPart = Mouse.Target
+	if not (Cube and targetPart and targetPart:HasTag("RubiksHitbox")) then return end
+	
+	local cublet = targetPart:FindFirstAncestorWhichIsA("Model")
+	
+	local GrabStart = Mouse.Hit.Position
+	local cell = Cube:GetCell(Mouse.Hit.Position)
+	local faceId = Mouse.TargetSurface
+
+	--print(cell)
+
+	DragConnect = RunService.Heartbeat:Connect(function()
+		local currentPos = Mouse.Hit.Position
+		if (GrabStart - currentPos).Magnitude >= Config.DragThreshold then
+			DragConnect:Disconnect()
+
+			local directionId
+			local minDistance = math.huge
+			local ray = Ray.new(Vector3.zero, (currentPos - GrabStart).Unit)
+
+			for i, normalId in pairs(Enum.NormalId:GetEnumItems()) do
+				local distance = ray:Distance(Vector3.fromNormalId(normalId)) 
+				if distance < minDistance then
+					minDistance = distance
+					directionId = normalId
+				end
+			end
+			
+			Cube:Rotate(cell, faceId, directionId)
+		end
+	end)
+end
+
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then return end
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		local targetPart = Mouse.Target
-		if CurrentCube and targetPart and targetPart:IsDescendantOf(CurrentCube.Cube) and targetPart:HasTag("Core") then
-			local cublet = targetPart:FindFirstAncestorWhichIsA("Model")
-			
-			local GrabStart = Mouse.Hit.Position
-			local cell = CurrentCube:GetCell(targetPart.Position)
-			local faceId = Mouse.TargetSurface
-			
-			--print(cell, faceId.Name)
-			
-			DragConnect = RunService.Heartbeat:Connect(function()
-				local currentPos = Mouse.Hit.Position
-				if (GrabStart - currentPos).Magnitude >= Config.DragThreshold then
-					DragConnect:Disconnect()
-					
-					local directionId
-					local minDistance = math.huge
-					local ray = Ray.new(Vector3.zero, (currentPos - GrabStart).Unit)
-					
-					for i, normalId in pairs(Enum.NormalId:GetEnumItems()) do
-						local distance = ray:Distance(Vector3.fromNormalId(normalId)) 
-						if distance < minDistance then
-							minDistance = distance
-							directionId = normalId
-						end
-					end
-					
-					CurrentCube:Rotate(cell, faceId, directionId)
-				end
-			end)
-		end
+		dragBegan()
 	elseif input.KeyCode == Enum.KeyCode.R then
-		CubeController.CreateCube(CurrentCube.Dimensions)
+		CubeController.CreateCube(Cube.Dimensions)
+	elseif input.KeyCode == Enum.KeyCode.T then
+		local normal = Enum.NormalId:GetEnumItems()[math.random(#Enum.NormalId:GetEnumItems())]
+		--normal = Enum.NormalId.Left
+		print(normal)
+		Cube:Orient(normal)
+		--Cube:Orient(Enum.NormalId.Back, Enum.NormalId.Front)
+	elseif input.KeyCode == Enum.KeyCode.Y then
+		Cube:Orient(Enum.NormalId.Top)
 	elseif input.KeyCode == Enum.KeyCode.S then
-		if CurrentCube then
-			local moves = CurrentCube:Scramble()
-			if moves then
-				ScrambleList.Show(moves)
-			end
-		end
+		CubeController.Scramble()
+	elseif input.KeyCode == Enum.KeyCode.Q then
+		CubeSolver.Solve(Cube)
 	end
 end)
 
@@ -130,6 +153,7 @@ UserInputService.InputEnded:Connect(function(input, gameProcessed)
 		end
 	end
 end)
+
 
 
 --// Setup

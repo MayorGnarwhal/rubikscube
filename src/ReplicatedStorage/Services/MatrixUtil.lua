@@ -1,10 +1,5 @@
 local MatrixUtil = {}
 
---// Dependencies
-local Services = game.ReplicatedStorage.Services
-local Collect = require(Services.Collect)
-
-
 --// Methods
 -- rotates the give matrix clockwise in place
 -- matrix must be an nxn matrix
@@ -38,6 +33,15 @@ function MatrixUtil.RotateCounterClockwise(matrix: table)
 	end
 end
 
+function MatrixUtil.Rotate(matrix: table, clockwise: boolean?)
+	if clockwise == nil then clockwise = true end
+	if clockwise then
+		MatrixUtil.RotateClockwise(matrix)
+	else
+		MatrixUtil.RotateCounterClockwise(matrix)
+	end
+end
+
 -- gets the elements in the nth row of the matrix
 function MatrixUtil.GetRow(matrix: table, row: number): table
 	local elements = {}
@@ -56,6 +60,14 @@ function MatrixUtil.GetColumn(matrix: table, column: number): table
 	end
 
 	return elements
+end
+
+function MatrixUtil.GetSlice(matrix: table, slice: "Row"|"Col", index: number)
+	if slice == "Row" then
+		return MatrixUtil.GetRow(matrix, index)
+	else
+		return MatrixUtil.GetColumn(matrix, index)
+	end
 end
 
 -- replaces the elements in the nth row
@@ -80,16 +92,11 @@ function MatrixUtil.ReplaceColumn(matrix: table, column: number, elements: table
 	end
 end
 
--- deep copies a matrix
-function MatrixUtil.Copy(tbl: table)
-	if type(tbl) == "table" then
-		local copy = {}
-		for key, value in pairs(tbl) do
-			copy[MatrixUtil.Copy(key)] = MatrixUtil.Copy(value)
-		end
-		return copy
+function MatrixUtil.ReplaceSlice(matrix: table, slice: "Row"|"Col", index: number, elements: table)
+	if slice == "Row" then
+		return MatrixUtil.ReplaceRow(matrix, index, elements)
 	else
-		return tbl
+		return MatrixUtil.ReplaceColumn(matrix, index, elements)
 	end
 end
 
