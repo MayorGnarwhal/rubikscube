@@ -12,7 +12,7 @@ Developed for CPSC470 Senior Project
 This game is built around an interactable 3x3 Rubik's Cube. Includes a solver algorithm that implements the Beginner's Method and provides detailed and interactable instructions for solving the cube in any state using an Iterative-Deepening A* Search Algorithm
 
 ## Results
-The Rubik's Cube solver was tested on 1,000 scrambles of 25 moves each. On average the solver can compute a solver in 3.64 seconds using about 109 moves.
+The Rubik's Cube solver was tested on 1,000 scrambles of 25 moves each. On average, the solver can compute a solve in 3.64 seconds using about 109 moves.
 
 ![image](https://github.com/MayorGnarwhal/rubikscube/assets/46070329/964d01b6-bd9a-4027-9aa3-7cbfe6cafa2f)
 
