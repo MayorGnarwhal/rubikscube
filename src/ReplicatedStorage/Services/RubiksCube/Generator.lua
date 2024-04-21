@@ -13,7 +13,7 @@ TemplateFace:AddTag("Face")
 TemplateFace.Anchored = true
 TemplateFace.CastShadow	= false
 TemplateFace.CanCollide = false
-TemplateFace.CanQuery = false
+--TemplateFace.CanQuery = false
 TemplateFace.TopSurface = Enum.SurfaceType.Smooth
 TemplateFace.BottomSurface = Enum.SurfaceType.Smooth
 

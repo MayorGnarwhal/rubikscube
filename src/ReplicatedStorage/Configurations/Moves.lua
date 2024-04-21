@@ -25,6 +25,15 @@ function Moves.Inverse(moveName)
 	end
 end
 
+Moves.FaceName = {
+	Top = "U",
+	Bottom = "D",
+	Back = "F",
+	Front = "B",
+	Left = "L",
+	Right = "R",
+}
+
 -- slice rotations
 Moves.M = {{Vector3.new(2, 3, 3), Enum.NormalId.Back, Enum.NormalId.Top}}
 Moves.Mi = {{Vector3.new(2, 3, 3), Enum.NormalId.Back, Enum.NormalId.Bottom}}
@@ -45,8 +54,8 @@ Moves.R2 = CombineMoves(Moves.R, Moves.R)
 Moves.Rr = CombineMoves(Moves.R, Moves.M)
 Moves.Rri = CombineMoves(Moves.Ri, Moves.Mi)
 
-Moves.L = {{Vector3.new(1, 3, 3), Enum.NormalId.Back, Enum.NormalId.Top}}
-Moves.Li = {{Vector3.new(1, 3, 3), Enum.NormalId.Back, Enum.NormalId.Bottom}}
+Moves.L = {{Vector3.new(1, 3, 3), Enum.NormalId.Back, Enum.NormalId.Bottom}}
+Moves.Li = {{Vector3.new(1, 3, 3), Enum.NormalId.Back, Enum.NormalId.Top}}
 Moves.L2 = CombineMoves(Moves.L, Moves.L)
 Moves.Ll = CombineMoves(Moves.L, Moves.M)
 Moves.Lli = CombineMoves(Moves.Li, Moves.Mi)

@@ -2,8 +2,6 @@ local RubiksCube = {}
 RubiksCube.__index = RubiksCube
 
 --// Dependencies
-local TweenService = game:GetService("TweenService")
-
 local Generator = require(script.Generator)
 local FaceMaps = require(script.FaceMaps)
 
@@ -13,6 +11,7 @@ local Tween = require(Services.Tween)
 local Util = require(Services.Util)
 
 local Configurations = game.ReplicatedStorage.Configurations
+local FaceColorMap = require(Configurations.FaceColorMap)
 local Palettes = require(Configurations.Palettes)
 local Config = require(Configurations.Config)
 local Moves = require(Configurations.Moves)
@@ -34,7 +33,7 @@ function RubiksCube.new(dimensions: number)
 	for i, faceId in pairs(Enum.NormalId:GetEnumItems()) do
 		map[faceId.Name] = MatrixUtil.Create(Vector2.new(dimensions, dimensions), faceId.Name)
 	end
-
+	
 	return RubiksCube.fromMap(map, true)
 end
 
@@ -69,10 +68,14 @@ function RubiksCube.fromMap(cubeMap: table, skipValidation: boolean?)
 		
 		Scrambled = false,
 		
+		-- config
+		RotationSpeed = 0.2,
+		
 		-- connections
-		MapChangedBindable = Instance.new("BindableEvent"),
-		SolveBeganBindable = Instance.new("BindableEvent"),
-		SolveEndedBindable = Instance.new("BindableEvent"),
+		-- only creates connections if physical cube is made
+		MapChangedBindable = nil,
+		SolveBeganBindable = nil,
+		SolveEndedBindable = nil,
 		
 		-- 3D cube variables
 		Size = nil,
@@ -88,6 +91,10 @@ end
 -- @param size	 nxnxn size of each cublet in studs
 -- @return Model
 function RubiksCube:GenerateCube3D(size: number, palette: Palettes.Palette?): Model
+	self.MapChangedBindable = self.MapChangedBindable or Instance.new("BindableEvent")
+	self.SolveBeganBindable = self.SolveBeganBindable or Instance.new("BindableEvent")
+	self.SolveEndedBindable = self.SolveEndedBindable or Instance.new("BindableEvent")
+	
 	if self.Cube then
 		self:DestroyCube3D()
 	end
@@ -108,9 +115,8 @@ end
 -- @param cell			3D cell of the cube clicked. can be retrieved from :GetCell()
 -- @param frontFaceId	front face of cube for rotation
 -- @param directionId	direction of rotation, in 3D space
-function RubiksCube:Rotate(cell: Vector3, frontFaceId: Enum.NormalId, directionId: Enum.NormalId)
+function RubiksCube:Rotate(cell: Vector3, frontFaceId: Enum.NormalId, directionId: Enum.NormalId, animLength: number?)
 	if self.Rotating then return end
-	self.Rotating = true
 	
 	local rotationNormal = Vector3.fromNormalId(frontFaceId):Cross(Vector3.fromNormalId(directionId))
 	if rotationNormal:FuzzyEq(Vector3.zero, 0.1) then
@@ -118,13 +124,13 @@ function RubiksCube:Rotate(cell: Vector3, frontFaceId: Enum.NormalId, directionI
 		return
 	end
 	
-	local rotationId = Util.GetNormalId(rotationNormal)
+	self.Rotating = true
 	
-	--print(cell, "//", frontFaceId.Name, "//", directionId.Name, "////", rotationId.Name)
+	local rotationId = Util.GetNormalId(rotationNormal)
 	
 	self:_doMapRotation(cell, frontFaceId, rotationId, directionId)
 	if self.Cube then
-		self:_doCubeRotation(cell, rotationId)
+		self:_doCubeRotation(cell, rotationId, nil, animLength)
 	end
 	
 	if self.Scrambled and not self.CurrentSolve then
@@ -157,11 +163,17 @@ end
 -- yields until rotation is finished
 -- @param topNormalId		normal of face to orient (Front/Back) are swapped
 -- @param targetNormalId?	normal to orient face towards. Default: Enum.NormalId.Top
-function RubiksCube:Orient(topNormalId: Enum.NormalId, targetNormalId: Enum.NormalId?)
+function RubiksCube:Orient(topNormalId: Enum.NormalId, targetNormalId: Enum.NormalId?, animLength: number?)
+	if not self.Cube then
+		warn("Cannot orient cube without a physical representation for reference")
+		return
+	end
+	
 	if self.Rotating then return end
 	self.Rotating = true
 
 	targetNormalId = targetNormalId or Enum.NormalId.Top
+	animLength = animLength or math.min(self.RotationSpeed, 0.2)
 
 	local cublets = self.Cube:GetChildren()
 	table.remove(cublets, table.find(cublets, self.Cube.Hitbox))
@@ -182,8 +194,15 @@ function RubiksCube:Orient(topNormalId: Enum.NormalId, targetNormalId: Enum.Norm
 	local angle = -math.rad(90)
 	local numTurns = 1
 	if rotationNormal:FuzzyEq(Vector3.zero, 0.1) then
+		-- 180 degree rotation, need to apply rotation in 2 steps
+		local axis = AxisMap[topNormalId]
+		local otherAxis = (axis == Enum.Axis.X and Enum.Axis.X) or 
+			(axis == Enum.Axis.Y and Enum.Axis.Z) or (axis == Enum.Axis.Z and Enum.Axis.X)
+		
+		local axisNormalId = Util.GetNormalId(Vector3.fromAxis(otherAxis))
+		
 		self.Rotating = false
-		self:Orient(topNormalId, Enum.NormalId.Front)
+		self:Orient(topNormalId, axisNormalId)
 		self:Orient(topNormalId, targetNormalId)
 
 		return
@@ -191,16 +210,21 @@ function RubiksCube:Orient(topNormalId: Enum.NormalId, targetNormalId: Enum.Norm
 
 	local frontFaceId = Util.GetNormalId(-lookVector)
 	local directionId = Util.GetNormalId(-targetVector)
-
-	for i = 1, 3 do
-		local cell = Vector3.new(i, i, i)
-
-		for i = 1, numTurns do
-			self:_doMapRotation(cell, frontFaceId, rotationId, directionId)
-			if self.Cube then
-				self:_doCubeRotation(cell, rotationId, angle)
-			end
+	
+	for j = 1, numTurns do
+		local completed = 0
+		for i = 1, 3 do
+			task.spawn(function()
+				local cell = Vector3.new(i, i, i)
+				self:_doMapRotation(cell, frontFaceId, rotationId, directionId)
+				if self.Cube then
+					self:_doCubeRotation(cell, rotationId, angle, animLength)
+				end
+				completed += 1
+			end)
 		end
+		
+		repeat task.wait() until completed == 3
 	end
 
 	self.Rotating = false
@@ -209,10 +233,12 @@ end
 -- @public
 -- implements a move from the Moves table
 -- @param move			a list of the arguments for :Rotate() from the Moves table
--- TODO @param frontFace		relative front face
-function RubiksCube:Move(move: table, frontFace: Enum.NormalId?)
-	-- TODO: implement frontFace
+function RubiksCube:Move(move: table, animLength: number?)
 	for i, args in ipairs(move) do
+		if animLength then
+			args = table.clone(args)
+			table.insert(args, animLength)
+		end
 		self:Rotate(unpack(args))
 	end
 end
@@ -252,6 +278,8 @@ function RubiksCube:ApplyPalette(palette: Palettes.Palette?)
 	if not self.Cube then return end
 
 	palette = palette or self.Palette
+	self.Palette = palette
+	
 	for i, face in pairs(self.Cube:GetDescendants()) do
 		if face:HasTag("Face") then
 			face.Color = palette[face:GetAttribute("Face")]
@@ -259,6 +287,8 @@ function RubiksCube:ApplyPalette(palette: Palettes.Palette?)
 			face.Color = palette.Core
 		end
 	end
+	
+	self.MapChangedBindable:Fire()
 end
 
 -- @public
@@ -283,6 +313,96 @@ function RubiksCube:IsSolved(): boolean
 		end
 	end
 
+	return true
+end
+
+function RubiksCube:StripPaint()
+	local n = self.Dimensions
+	local m = math.ceil(n / 2)
+	
+	for faceName, matrix in pairs(self.Map) do
+		for x = 1, n do
+			for y = 1, n do
+				if not (x == m and y == m) then
+					matrix[x][y] = false
+				end
+			end
+		end
+	end
+	
+	for i, cublet in pairs(self.Cube:GetChildren()) do
+		if cublet:GetAttribute("CubletType") == "Center" then continue end
+		
+		for i, face in pairs(self:_getCubletFaces(cublet)) do
+			face.Color = Config.UnpaintedColor
+		end
+	end
+	
+	self.MapChangedBindable:Fire()
+end
+
+function RubiksCube:Paint(cell: Vector3, sideId: Enum.NormalId, faceId: Enum.NormalId, colorId: Enum.NormalId)
+	local n = self.Dimensions
+	local m = math.ceil(n / 2)
+	
+	local axis = AxisMap[sideId]
+	local coordAxes
+	if axis == Enum.Axis.Z then
+		coordAxes = {Enum.Axis.X, Enum.Axis.Y}
+	elseif axis == Enum.Axis.Y then
+		coordAxes = {Enum.Axis.X, Enum.Axis.Z}
+	elseif axis == Enum.Axis.X then
+		coordAxes = {Enum.Axis.Z, Enum.Axis.Y}
+	end
+	
+	local coord = Vector2.new(cell[coordAxes[1].Name], cell[coordAxes[2].Name])
+	if FaceMaps.FlipedFaces.Col[sideId] then
+		coord = Vector2.new(n - coord.X + 1, coord.Y)
+	end
+	
+	if FaceMaps.FlipedFaces.Row[sideId] then
+		coord = Vector2.new(coord.X, n - coord.Y + 1)
+	end
+	
+	if coord.X == m and coord.Y == m then
+		return -- cannot paint a center piece
+	end
+	
+	self.Map[sideId.Name][coord.X][coord.Y] = colorId.Name
+	
+	local face = self:_getFace(cell, faceId)
+	if face then
+		face.Color = self.Palette[colorId.Name]
+	end
+	
+	self.MapChangedBindable:Fire()
+end
+
+-- @public
+function RubiksCube:IsValidPaint()
+	local stickerCount = {}
+	for i, normalId in pairs(Enum.NormalId:GetEnumItems()) do
+		stickerCount[normalId.Name] = 0
+	end
+	
+	for faceName, matrix in pairs(self.Map) do
+		for x = 1, self.Dimensions do
+			for y = 1, self.Dimensions do
+				local cellName = matrix[x][y]
+				if not cellName then
+					return false, "There is still an unpainted face."
+				end
+				stickerCount[cellName] += 1
+			end
+		end
+	end
+	
+	for faceName, count in pairs(stickerCount) do
+		if count ~= self.Dimensions^2 then
+			return false, "There are too many " .. FaceColorMap[faceName] .. " stickers."
+		end
+	end
+	
 	return true
 end
 
@@ -346,7 +466,9 @@ function RubiksCube:_doMapRotation(cell: Vector3, frontFaceId: Enum.NormalId, ro
 		MatrixUtil.ReplaceSlice(matrix2, slice2, index2, elements)
 	end
 	
-	self.MapChangedBindable:Fire(self.Map)
+	if self.MapChangedBindable then
+		self.MapChangedBindable:Fire(self.Map)
+	end
 end
 
 -- @private
@@ -364,7 +486,7 @@ function RubiksCube:_doCubeRotation(cell: Vector3, rotationId: Enum.NormalId, an
 	end
 	
 	local angle = angle or -math.rad(90)
-	self:_doCubletRotation(cublets, angle, rotationId)
+	self:_doCubletRotation(cublets, angle, rotationId, animLength)
 end
 
 -- @private
@@ -374,7 +496,8 @@ end
 -- @param rotationId	axis of rotation
 -- @param animLength?	duration in seconds of animation. Default: 0.2
 function RubiksCube:_doCubletRotation(cublets: {Model}, angle: number, rotationId: Enum.NormalId, animLength: number?)
-	animLength = animLength or 0.2
+	animLength = animLength or self.RotationSpeed
+	
 	local center = CFrame.new(Util.Midpoint(cublets))
 	
 	local theta = Vector3.new(angle, angle, angle) * Vector3.fromNormalId(rotationId)
@@ -386,7 +509,6 @@ function RubiksCube:_doCubletRotation(cublets: {Model}, angle: number, rotationI
 	end
 
 	-- animate rotation
-	-- TODO: use base TweenService
 	local tweenInfo = TweenInfo.new(animLength, Enum.EasingStyle.Sine)
 	local tween = Tween:Connect(0, 1, tweenInfo, function(alpha)
 		local pivot = center:Lerp(targetCf, alpha)
@@ -429,6 +551,21 @@ function RubiksCube:_getCublet(cubletType: "Center"|"Edge"|"Corner", ...): Model
 
 		if success then
 			return cublet
+		end
+	end
+end
+
+-- @private
+function RubiksCube:_getFace(cell: Vector3, faceId: Enum.NormalId)
+	for i, cublet in pairs(self.Cube:GetChildren()) do
+		local cubletCell = self:GetCell(cublet:GetPivot().Position)
+		if cubletCell == cell then
+			local faces = self:_getCubletFaces(cublet)
+			for j, face in pairs(faces) do
+				if face:GetAttribute("Face") == faceId.Name then
+					return face
+				end
+			end
 		end
 	end
 end

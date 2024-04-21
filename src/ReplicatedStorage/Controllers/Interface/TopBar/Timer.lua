@@ -3,27 +3,18 @@ local Timer = {}
 --// Dependencies
 local RunService = game:GetService("RunService")
 
+local Services = game.ReplicatedStorage.Services
+local Util = require(Services.Util)
+
 local LocalPlayer = game.Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-local Display = PlayerGui:WaitForChild("MainGui"):WaitForChild("Timer")
+local Display = PlayerGui:WaitForChild("MainGui"):WaitForChild("TopBar"):WaitForChild("Timer")
 
 --// Variables
 local IsRunning = false
 local Blinking = false
 local StartTimestamp
 local Connect
-
-
---// Helper functions
-local function FormatTime(s: number): string
-	local minutes = math.floor(s / 60)
-	s -= (minutes * 60)
-	local seconds = math.floor(s)
-	s -= seconds
-	local milliseconds = math.round(s * 1000)
-	
-	return ("%.02d:%.02d:%.03d"):format(minutes, seconds, milliseconds)
-end
 
 
 --// Methods
@@ -67,7 +58,7 @@ function Timer.StopBlinking()
 end
 
 function Timer.SetTime(seconds: number?)
-	Display.Title.Text = FormatTime(seconds or Timer.GetTime())
+	Display.Title.Text = Util.ClockTime(seconds or Timer.GetTime())
 end
 
 function Timer.GetTime()

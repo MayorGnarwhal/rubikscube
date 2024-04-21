@@ -10,6 +10,17 @@ export type Palette = {
 
 local Palettes = {}
 
+Palettes.Unpainted = {
+	Core = BrickColor.new("Really black").Color,
+	Top = BrickColor.new("Really black").Color,
+	Bottom = BrickColor.new("Really black").Color,
+	Front = BrickColor.new("Really black").Color,
+	Back = BrickColor.new("Really black").Color,
+	Left = BrickColor.new("Really black").Color,
+	Right = BrickColor.new("Really black").Color,
+}
+
+-- default with brick colors
 Palettes.Standard = {
 	Core = BrickColor.new("Really black").Color,
 	Top = BrickColor.new("Institutional white").Color,

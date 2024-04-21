@@ -123,5 +123,15 @@ function Util.SplitArray(array, numGroups)
 	return split
 end
 
+function Util.ClockTime(s)
+	local minutes = math.floor(s / 60)
+	s -= (minutes * 60)
+	local seconds = math.floor(s)
+	s -= seconds
+	local milliseconds = math.round(s * 1000)
+
+	return ("%.02d:%.02d:%.03d"):format(minutes, seconds, milliseconds)
+end
+
 --//
 return Util

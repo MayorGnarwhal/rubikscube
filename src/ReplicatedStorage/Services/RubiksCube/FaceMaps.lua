@@ -10,14 +10,6 @@ FaceMaps.AxisMap = {
 	[Enum.NormalId.Back] = Enum.Axis.Z,
 }
 
--- faces that swap elements on the axis' (clockwise) rotation
--- flip array to get counterclockwise cycle
-FaceMaps.FaceRotationCycles = { -- TODO: is this necessary?
-	[Enum.Axis.X] = {Enum.NormalId.Front, Enum.NormalId.Top, Enum.NormalId.Back, Enum.NormalId.Bottom},
-	[Enum.Axis.Y] = {Enum.NormalId.Front, Enum.NormalId.Right, Enum.NormalId.Back, Enum.NormalId.Left},
-	[Enum.Axis.Z] = {Enum.NormalId.Top, Enum.NormalId.Right, Enum.NormalId.Bottom, Enum.NormalId.Left},
-}
-
 -- normalId to face. Front and Back are swapped because of rubik's cube notation
 FaceMaps.NormalFaceMap = {
 	[Enum.NormalId.Top] = Enum.NormalId.Top,
@@ -28,6 +20,8 @@ FaceMaps.NormalFaceMap = {
 	[Enum.NormalId.Back] = Enum.NormalId.Front,
 }
 
+-- [rotationAxis][faceAxis] = sliceType
+-- when rotating a face, take either a row or column from each face
 FaceMaps.RotationSliceMap = {
 	[Enum.Axis.X] = {
 		[Enum.Axis.X] = "Row",
@@ -46,6 +40,7 @@ FaceMaps.RotationSliceMap = {
 	},
 }
 
+-- when the order of a slice should be reversed on a particular face
 FaceMaps.FlipedFaces = {
 	Col = {
 		[Enum.NormalId.Right] = true,
@@ -60,6 +55,7 @@ FaceMaps.FlipedFaces = {
 	},
 }
 
+-- when the order of a slice should be reversed on a particular face
 FaceMaps.ReverseSliceMap = {
 	[Enum.NormalId.Top] = {
 		[Enum.NormalId.Left] = true,

@@ -1,17 +1,26 @@
 local CubeMap = {}
 
 --// Dependencies
+local Controllers = game.ReplicatedStorage.Controllers
+local InterfaceUtil = require(Controllers.Interface.InterfaceUtil)
+
+local Services = game.ReplicatedStorage.Services
+local Audio = require(Services.Audio)
+
 local Configurations = game.ReplicatedStorage.Configurations
 local Palettes = require(Configurations.Palettes)
+local Config = require(Configurations.Config)
 
 local LocalPlayer = game.Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-local Display = PlayerGui:WaitForChild("MainGui"):WaitForChild("CubeMap")
+local Menu = PlayerGui:WaitForChild("MainGui"):WaitForChild("CubeMap")
+local Content = Menu:WaitForChild("Content")
+local Toggle = Menu:WaitForChild("Toggle")
 
 
 --// Methods
 function CubeMap.Populate(dimensions: number)
-	for i, face in pairs(Display:GetChildren()) do
+	for i, face in pairs(Content:GetChildren()) do
 		if not face:IsA("Frame") then continue end
 		
 		local templateCell = face.Content:FindFirstChildOfClass("Frame"):Clone()
@@ -39,19 +48,36 @@ end
 function CubeMap.ApplyPalette(cubeMap: table, palette: Palettes.Palette?)
 	palette = palette or Palettes.Standard
 	
+	local n = #next(cubeMap)
+	
 	for side, matrix in pairs(cubeMap) do
-		local container = Display:FindFirstChild(side).Content
+		local container = Content:FindFirstChild(side).Content
 
-		for y = 1, 3 do
-			for x = 1, 3 do
+		for y = 1, n do
+			for x = 1, n do
 				local cell = container:FindFirstChild(x .. "_" .. y)
 				local face = matrix[x][y]
 				
-				cell.BackgroundColor3 = palette[face]
+				cell.BackgroundColor3 = palette[face] or Config.UnpaintedColor
 			end
 		end
 	end
 end
+
+
+--// Setup
+InterfaceUtil.HoverUnderline(Toggle)
+
+Toggle.MouseButton1Click:Connect(function()
+	Audio.Play(Audio.Sounds.GuiClick)
+	if Content.Visible then
+		Content.Visible = false
+		Toggle.Title.Text = "Show"
+	else
+		Content.Visible = true
+		Toggle.Title.Text = "Hide"
+	end
+end)
 
 --//
 return CubeMap
