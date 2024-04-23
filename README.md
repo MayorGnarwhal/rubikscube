@@ -1,7 +1,9 @@
 # Table of Contents
 - [About](#about)
 - [Results](#results)
-- [Usages](#usage)
+- [Usage](#usage)
+  - [How to Play](#how-to-play)
+  - [How to Edit](#how-to-edit)
 - [Dependencies](#dependencies)
 - [Development Resources](#development-resources)
 
@@ -18,10 +20,17 @@ The Rubik's Cube solver was tested on 1,000 scrambles of 25 moves each. On avera
 
 
 ## Usage
-The game is freely playable on the Roblox platform at https://www.roblox.com/games/16071438266
+### How to Play
+- Navigate to the [game page](https://www.roblox.com/games/16071438266) on roblox.com
+- Login to your account or Signup with a new account
+- Click `Play` button
+  - If the Roblox Player is not already installed, a prompt to install will appear
 
-A copy of the game can be downloaded in the form of an .rbxl file can be downloaded from the [lastest release](https://github.com/MayorGnarwhal/rubikscube/releases).
-- Open in Roblox Studio through File > Open From File and selecting .rbxl file
+### How To Edit
+- Download the .rbxl file from the [lastest release](https://github.com/MayorGnarwhal/rubikscube/releases)
+- Download and install [Roblox Studio](https://create.roblox.com/landing)
+- Inside of Roblox Studio, navigate to `File > Open from File`
+  - Select and open the .rbxl
 
 
 ## Dependencies
@@ -32,6 +41,6 @@ A copy of the game can be downloaded in the form of an .rbxl file can be downloa
 
 
 ## Development Resources
-- Implementation of Iterative-Deepening A* Search Algorithm based on implementation of [DeepCubeA](https://deepcube.igb.uci.edu/static/files/SolvingTheRubiksCubeWithDeepReinforcementLearningAndSearch_Final.pdf) by McAleer et. al.
+- Implementation of Iterative-Deepening A* Search Algorithm based on [DeepCubeA](https://deepcube.igb.uci.edu/static/files/SolvingTheRubiksCubeWithDeepReinforcementLearningAndSearch_Final.pdf) by McAleer et. al.
 - Developed in [Roblox Studio](https://create.roblox.com/landing)
 - Exported to GitHub through [Rojo](https://rojo.space/) and [rblx-to-rojo](https://github.com/rojo-rbx/rbxlx-to-rojo)
