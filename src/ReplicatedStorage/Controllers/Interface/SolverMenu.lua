@@ -264,6 +264,8 @@ function SolverMenu.BeginSolve()
 		NumMoves = 0,
 	}
 	
+	StageIndex = 0
+	
 	IsSolving = true
 	CubeController.SetMovementLock(true)
 	
@@ -306,8 +308,8 @@ function SolverMenu.BeginSolve()
 		
 		lastInstructionIndex = #InstructionCache
 		
-		if index == 1 then
-			SolverMenu.DisplayStage(index)
+		if StageIndex == 0 and #InstructionCache > 0 then
+			SolverMenu.DisplayStage(1)
 		end
 	end
 	

@@ -101,14 +101,19 @@ function FirstLayer.FindCornerInTopLayer(cube: table)
 			local topIsWhite = topColor == "Top"
 			
 			if topIsWhite or face[index][1] == "Top" then
+				
 				local cornerColors = {}
-				if not topIsWhite then
+				if topIsWhite then
+					local faceColor = face[3 - j + 1][3]
+					table.insert(cornerColors, faceColor)
+				else
 					table.insert(cornerColors, topColor)
 				end
 				
 				local isSolved = topIsWhite
 				for sideFace, coord in pairs(coords) do
 					local faceColor = cube[sideFace][coord.X][coord.Y]
+					
 					if faceColor ~= "Top" then
 						table.insert(cornerColors, faceColor)
 					end
