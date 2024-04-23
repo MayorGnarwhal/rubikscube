@@ -9,6 +9,7 @@ local CubeController = require(Controllers.CubeController)
 local Scenes = require(Controllers.Interface.Scenes)
 
 local Services = game.ReplicatedStorage.Services
+local RichTextColor = require(Services.RichTextColor)
 local MouseTarget = require(Services.MouseTarget)
 local Audio = require(Services.Audio)
 local Util = require(Services.Util)
@@ -89,7 +90,8 @@ end
 function CubePainter.Paint()
 	local success, err = CubeController.CurrentCube():IsValidPaint()
 	if not success then
-		PromptPaintFail(err)
+		local message = RichTextColor.Apply(err)
+		PromptPaintFail(message)
 		return false
 	end
 	

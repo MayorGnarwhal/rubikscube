@@ -398,7 +398,7 @@ function RubiksCube:IsValidPaint()
 	end
 	
 	for faceName, count in pairs(stickerCount) do
-		if count ~= self.Dimensions^2 then
+		if count > self.Dimensions^2 then
 			return false, "There are too many " .. FaceColorMap[faceName] .. " stickers."
 		end
 	end
